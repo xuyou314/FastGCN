@@ -7,7 +7,7 @@ from networkx.readwrite import json_graph
 import scipy.sparse as sp
 import numpy as np
 import pickle as pkl
-
+import os
 
 def loadRedditFromG(dataset_dir, inputfile):
     f= open(dataset_dir+inputfile)
@@ -29,23 +29,23 @@ def loadRedditFromNPZ(dataset_dir):
 def transferRedditData2AdjNPZ(dataset_dir):
     G = json_graph.node_link_graph(json.load(open(dataset_dir + "/reddit-G.json")))
     feat_id_map = json.load(open(dataset_dir + "/reddit-id_map.json"))
-    feat_id_map = {id: val for id, val in feat_id_map.iteritems()}
+    feat_id_map = {val: val for id, val in feat_id_map.iteritems()}
     numNode = len(feat_id_map)
     print(numNode)
     adj = sp.lil_matrix((numNode, numNode))
     print("no")
     for edge in G.edges():
-        adj[feat_id_map[edge[0]], feat_id_map[edge[1]]] = 1
-    sp.save_npz("reddit_adj.npz", sp.coo_matrix(adj))
+        adj[edge[0], edge[1]] = 1
+    sp.save_npz("./data/reddit_adj.npz", sp.coo_matrix(adj))
 
 
 def transferRedditDataFormat(dataset_dir, output_file):
     G = json_graph.node_link_graph(json.load(open(dataset_dir + "/reddit-G.json")))
     labels = json.load(open(dataset_dir + "/reddit-class_map.json"))
 
-    train_ids = [n for n in G.nodes() if not G.node[n]['val'] and not G.node[n]['test']]
-    test_ids = [n for n in G.nodes() if G.node[n]['test']]
-    val_ids = [n for n in G.nodes() if G.node[n]['val']]
+    train_ids = [n for n in G.nodes() if G.node[n]!={} and not G.node[n]['val'] and not G.node[n]['test']]
+    test_ids = [n for n in G.nodes() if G.node[n]!={} and G.node[n]['test']]
+    val_ids = [n for n in G.nodes() if G.node[n]!={} and G.node[n]['val']]
     train_labels = [labels[i] for i in train_ids]
     test_labels = [labels[i] for i in test_ids]
     val_labels = [labels[i] for i in val_ids]
@@ -53,7 +53,7 @@ def transferRedditDataFormat(dataset_dir, output_file):
     ## Logistic gets thrown off by big counts, so log transform num comments and score
     feats[:, 0] = np.log(feats[:, 0] + 1.0)
     feats[:, 1] = np.log(feats[:, 1] - min(np.min(feats[:, 1]), -1))
-    feat_id_map = json.load(open(dataset_dir + "reddit-id_map.json"))
+    feat_id_map = json.load(open(dataset_dir + "/reddit-id_map.json"))
     feat_id_map = {id: val for id, val in feat_id_map.iteritems()}
 
     train_index = [feat_id_map[id] for id in train_ids]
@@ -66,4 +66,7 @@ def transferRedditDataFormat(dataset_dir, output_file):
 
 if __name__=="__main__":
     # transferRedditData2AdjNPZ("reddit")
-    transferRedditDataFormat("reddit","reddit.npz")
+    if not os.path.exists("./data/reddit.npz"):
+        transferRedditDataFormat("reddit","./data/reddit.npz")
+    if not os.path.exists("./data/reddit_adj.npz"):
+        transferRedditData2AdjNPZ("reddit")
